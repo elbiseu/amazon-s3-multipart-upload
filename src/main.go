@@ -32,7 +32,7 @@ type Link struct {
 }
 
 type Message struct {
-	Key    string `json:"id"`
+	Key    string `json:"key"`
 	Status string `json:"status"`
 	Links  []Link `json:"links"`
 }
