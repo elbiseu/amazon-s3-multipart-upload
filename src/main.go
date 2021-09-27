@@ -41,6 +41,8 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	switch r.Method {
 	case http.MethodPost:
+		w.Header().Set("Accept", "application/octet-stream")
+		w.Header().Set("Content-Type", "application/json")
 		contentType := r.Header.Get("Content-Type")
 		if !strings.HasPrefix(contentType, "image/") && !strings.HasPrefix(contentType, "video/") {
 			w.WriteHeader(http.StatusUnsupportedMediaType)
