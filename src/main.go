@@ -36,7 +36,6 @@ type Message struct {
 }
 
 func FileHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	switch r.Method {
 	case http.MethodPost:
 		w.Header().Set("Accept", "application/octet-stream")
@@ -72,6 +71,7 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 				return ""
 			}
 		}(contentType)
+		ctx := r.Context()
 		multipartUploadOutput, err := client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 			Bucket:                    aws.String(bucket),
 			Key:                       aws.String(uuid.New().String() + filenameExtension),
