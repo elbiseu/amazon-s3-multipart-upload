@@ -27,14 +27,12 @@ var (
 )
 
 type Link struct {
-	URL    string `json:"url"`
-	Method string `json:"method"`
+	URL string `json:"url"`
 }
 
 type Message struct {
-	Key    string `json:"key"`
-	Status string `json:"status"`
-	Links  []Link `json:"links"`
+	Key   string `json:"key"`
+	Links []Link `json:"links"`
 }
 
 func FileHandler(w http.ResponseWriter, r *http.Request) {
@@ -52,9 +50,31 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 			return
 		}
+		filenameExtension := func(contentType string) string {
+			switch contentType {
+			case "image/gif":
+				return ".gif"
+			case "image/jpeg":
+				return ".jpeg"
+			case "image/png":
+				return ".png"
+			case "image/tiff":
+				return ".tiff"
+			case "video/quicktime":
+				return ".mov"
+			case "video/mpeg":
+				return ".mpeg"
+			case "video/mp4 ":
+				return ".mp4"
+			case "video/webm":
+				return ".webm"
+			default:
+				return ""
+			}
+		}(contentType)
 		multipartUploadOutput, err := client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 			Bucket:                    aws.String(bucket),
-			Key:                       aws.String(uuid.New().String()),
+			Key:                       aws.String(uuid.New().String() + filenameExtension),
 			ACL:                       types.ObjectCannedACLPrivate,
 			BucketKeyEnabled:          false,
 			CacheControl:              nil,
@@ -93,7 +113,7 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 		var lastPart bool
 		var partNumber int32 = 1 // The first part number must always start with 1.
 		for !lastPart {
-			n, err := io.CopyN(&buffer, r.Body, 4096)
+			n, err := io.CopyN(&buffer, r.Body, maxContentSize)
 			// The io.EOF error occurs when the stream has reached its end.
 			if n == 0 || err == io.EOF {
 				lastPart = true
@@ -104,34 +124,32 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			// If the buffer has the minimum required size or the current part is the last one,
 			// a new part is stored in the bucket.
-			if buffer.Len() > minUploadPartSize || lastPart {
-				uploadPartOutput, err := client.UploadPart(ctx, &s3.UploadPartInput{
-					Bucket:               multipartUploadOutput.Bucket,
-					Key:                  multipartUploadOutput.Key,
-					PartNumber:           partNumber,
-					UploadId:             multipartUploadOutput.UploadId,
-					Body:                 bytes.NewReader(buffer.Bytes()),
-					ContentLength:        0,
-					ContentMD5:           nil,
-					ExpectedBucketOwner:  nil,
-					RequestPayer:         "",
-					SSECustomerAlgorithm: nil,
-					SSECustomerKey:       nil,
-					SSECustomerKeyMD5:    nil,
-				})
-				if err != nil {
-					log.Println(err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				completedParts = append(completedParts, types.CompletedPart{
-					ETag:       uploadPartOutput.ETag,
-					PartNumber: partNumber,
-				})
-				// The buffer is empty to the next parts.
-				buffer.Reset()
-				partNumber++
+			uploadPartOutput, err := client.UploadPart(ctx, &s3.UploadPartInput{
+				Bucket:               multipartUploadOutput.Bucket,
+				Key:                  multipartUploadOutput.Key,
+				PartNumber:           partNumber,
+				UploadId:             multipartUploadOutput.UploadId,
+				Body:                 bytes.NewReader(buffer.Bytes()),
+				ContentLength:        int64(buffer.Len()),
+				ContentMD5:           nil,
+				ExpectedBucketOwner:  nil,
+				RequestPayer:         "",
+				SSECustomerAlgorithm: nil,
+				SSECustomerKey:       nil,
+				SSECustomerKeyMD5:    nil,
+			})
+			if err != nil {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
+			completedParts = append(completedParts, types.CompletedPart{
+				ETag:       uploadPartOutput.ETag,
+				PartNumber: partNumber,
+			})
+			// The buffer is empty to the next parts.
+			buffer.Reset()
+			partNumber++
 		}
 		completeMultipartUploadOutput, err := client.CompleteMultipartUpload(ctx,
 			&s3.CompleteMultipartUploadInput{
@@ -149,17 +167,14 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		msg := Message{
-			Key:    *completeMultipartUploadOutput.Key,
-			Status: "Created",
+		b, err := json.Marshal(Message{
+			Key: *completeMultipartUploadOutput.Key,
 			Links: []Link{
 				{
-					URL:    *completeMultipartUploadOutput.Location,
-					Method: http.MethodGet,
+					URL: *completeMultipartUploadOutput.Location,
 				},
 			},
-		}
-		b, err := json.Marshal(msg)
+		})
 		if err != nil {
 			log.Println(err)
 			w.WriteHeader(http.StatusInternalServerError)
