@@ -18,7 +18,7 @@ import (
 
 const (
 	maxContentSize    int64 = 1024 * 1024 * 2500 // 2500 MB
-	minUploadPartSize int   = 1024 * 1024 * 5    // 5 MB
+	minUploadPartSize int64 = 1024 * 1024 * 5    // 5 MB
 )
 
 var (
@@ -113,7 +113,7 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 		var lastPart bool
 		var partNumber int32 = 1 // The first part number must always start with 1.
 		for !lastPart {
-			n, err := io.CopyN(&buffer, r.Body, maxContentSize)
+			n, err := io.CopyN(&buffer, r.Body, minUploadPartSize)
 			// The io.EOF error occurs when the stream has reached its end.
 			if n == 0 || err == io.EOF {
 				lastPart = true
