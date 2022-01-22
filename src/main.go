@@ -22,8 +22,8 @@ const (
 )
 
 var (
-	client *s3.Client
-	bucket = os.Getenv("BUCKET")
+	s3Client *s3.Client
+	bucket   = os.Getenv("BUCKET")
 )
 
 type Link struct {
@@ -72,7 +72,7 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}(contentType)
 		ctx := r.Context()
-		multipartUploadOutput, err := client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		multipartUploadOutput, err := s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 			Bucket:                    aws.String(bucket),
 			Key:                       aws.String(uuid.New().String() + filenameExtension),
 			ACL:                       types.ObjectCannedACLPrivate,
@@ -108,12 +108,22 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		var buffer bytes.Buffer
+		// Skip data already stored.
+		/*
+			if false {
+				if _, err := io.CopyN(ioutil.Discard, r.Body, minUploadPartSize); err != nil {
+					log.Println(err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+		*/
+		var buff bytes.Buffer
 		var completedParts []types.CompletedPart
 		var lastPart bool
 		var partNumber int32 = 1 // The first part number must always start with 1.
 		for !lastPart {
-			n, err := io.CopyN(&buffer, r.Body, minUploadPartSize)
+			n, err := io.CopyN(&buff, r.Body, minUploadPartSize)
 			// The io.EOF error occurs when the stream has reached its end.
 			if n == 0 || err == io.EOF {
 				lastPart = true
@@ -122,15 +132,15 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			// If the buffer has the minimum required size or the current part is the last one,
+			// If the buff has the minimum required size or the current part is the last one,
 			// a new part is stored in the bucket.
-			uploadPartOutput, err := client.UploadPart(ctx, &s3.UploadPartInput{
+			uploadPartOutput, err := s3Client.UploadPart(ctx, &s3.UploadPartInput{
 				Bucket:               multipartUploadOutput.Bucket,
 				Key:                  multipartUploadOutput.Key,
 				PartNumber:           partNumber,
 				UploadId:             multipartUploadOutput.UploadId,
-				Body:                 bytes.NewReader(buffer.Bytes()),
-				ContentLength:        int64(buffer.Len()),
+				Body:                 bytes.NewReader(buff.Bytes()),
+				ContentLength:        int64(buff.Len()),
 				ContentMD5:           nil,
 				ExpectedBucketOwner:  nil,
 				RequestPayer:         "",
@@ -147,11 +157,11 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 				ETag:       uploadPartOutput.ETag,
 				PartNumber: partNumber,
 			})
-			// The buffer is empty to the next parts.
-			buffer.Reset()
+			// The buff is empty to the next parts.
+			buff.Reset()
 			partNumber++
 		}
-		completeMultipartUploadOutput, err := client.CompleteMultipartUpload(ctx,
+		completeMultipartUploadOutput, err := s3Client.CompleteMultipartUpload(ctx,
 			&s3.CompleteMultipartUploadInput{
 				Bucket:              multipartUploadOutput.Bucket,
 				Key:                 multipartUploadOutput.Key,
@@ -199,7 +209,7 @@ func init() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	client = s3.NewFromConfig(cfg)
+	s3Client = s3.NewFromConfig(cfg)
 }
 
 func main() {
