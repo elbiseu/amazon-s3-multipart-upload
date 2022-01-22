@@ -35,6 +35,29 @@ type Message struct {
 	Links []Link `json:"links"`
 }
 
+func GetFilenameExtension(contentType string) string {
+	switch contentType {
+	case "image/gif":
+		return ".gif"
+	case "image/jpeg":
+		return ".jpeg"
+	case "image/png":
+		return ".png"
+	case "image/tiff":
+		return ".tiff"
+	case "video/quicktime":
+		return ".mov"
+	case "video/mpeg":
+		return ".mpeg"
+	case "video/mp4":
+		return ".mp4"
+	case "video/webm":
+		return ".webm"
+	default:
+		return ""
+	}
+}
+
 func FileHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -49,28 +72,7 @@ func FileHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 			return
 		}
-		filenameExtension := func(contentType string) string {
-			switch contentType {
-			case "image/gif":
-				return ".gif"
-			case "image/jpeg":
-				return ".jpeg"
-			case "image/png":
-				return ".png"
-			case "image/tiff":
-				return ".tiff"
-			case "video/quicktime":
-				return ".mov"
-			case "video/mpeg":
-				return ".mpeg"
-			case "video/mp4 ":
-				return ".mp4"
-			case "video/webm":
-				return ".webm"
-			default:
-				return ""
-			}
-		}(contentType)
+		filenameExtension := GetFilenameExtension(contentType)
 		ctx := r.Context()
 		multipartUploadOutput, err := s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 			Bucket:                    aws.String(bucket),
