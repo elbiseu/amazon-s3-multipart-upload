@@ -72,7 +72,7 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 			WebsiteRedirectLocation:   nil,
 		})
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -86,7 +86,7 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 			if n == 0 || err == io.EOF {
 				lastPart = true
 			} else if err != nil {
-				log.Println(err)
+				log.Print(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -107,7 +107,7 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 				SSECustomerKeyMD5:    nil,
 			})
 			if err != nil {
-				log.Println(err)
+				log.Print(err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -131,7 +131,7 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 				RequestPayer: "",
 			})
 		if err != nil {
-			log.Println(err)
+			log.Print(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -145,7 +145,7 @@ func fileHandler(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		}); err != nil {
-			log.Println(err)
+			log.Print(err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
